@@ -7,6 +7,8 @@ export async function POST(request: NextRequest) {
     const body: ResearchRequest = await request.json();
     const { topic, wordCount, format = 'ieee' } = body;
 
+    console.log('API called with:', { topic: topic?.substring(0, 50), wordCount, format });
+
     if (!topic) {
       return NextResponse.json({ error: 'Topic is required' }, { status: 400 });
     }
@@ -14,8 +16,11 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
+      console.error('GEMINI_API_KEY not set');
       return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
     }
+    
+    console.log('API key exists, length:', apiKey.length);
 
     // Format-specific citation styles
     const citationStyles: Record<string, string> = {
@@ -80,10 +85,18 @@ Rules:
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Gemini API error:', errorData);
+      const errorText = await response.text();
+      console.error('Gemini API error status:', response.status);
+      console.error('Gemini API error text:', errorText);
+      let errorMessage = 'Gemini API error';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error?.message || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
       return NextResponse.json(
-        { error: errorData.error?.message || 'Gemini API error' },
+        { error: errorMessage },
         { status: 500 }
       );
     }
@@ -153,17 +166,18 @@ Rules:
 
     return NextResponse.json({ paper });
     
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
+  } catch (error: any) {
+    console.error('API Error:', error);
+    
+    if (error?.name === 'AbortError') {
       return NextResponse.json(
         { error: 'Request timed out. Please try again.' },
         { status: 504 }
       );
     }
     
-    console.error('Error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate research paper' },
+      { error: error?.message || 'Failed to generate research paper' },
       { status: 500 }
     );
   }

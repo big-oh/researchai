@@ -64,7 +64,8 @@ export default function ResearchDashboard({ onBack }: ResearchDashboardProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate research');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
       const data = await response.json();
