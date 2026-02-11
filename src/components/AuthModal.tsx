@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Mail, Lock, User, Loader2, Chrome } from 'lucide-react';
+import { X, Mail, Lock, User, Loader2, Chrome, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface AuthModalProps {
@@ -23,6 +23,32 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
 
   if (!isOpen) return null;
 
+  const getErrorMessage = (error: any): string => {
+    const errorCode = error?.code || error?.message || '';
+    
+    // Map Supabase errors to friendly messages
+    if (errorCode.includes('invalid_credentials') || errorCode.includes('Invalid login credentials')) {
+      return 'Invalid email or password. Please check your credentials or sign up if you don\'t have an account.';
+    }
+    if (errorCode.includes('user_not_found')) {
+      return 'No account found with this email. Please sign up first.';
+    }
+    if (errorCode.includes('email_taken') || errorCode.includes('already registered')) {
+      return 'An account with this email already exists. Please sign in instead.';
+    }
+    if (errorCode.includes('weak_password')) {
+      return 'Password is too weak. Please use at least 6 characters.';
+    }
+    if (errorCode.includes('invalid_email')) {
+      return 'Please enter a valid email address.';
+    }
+    if (errorCode.includes('email_not_confirmed')) {
+      return 'Please check your email and confirm your account before signing in.';
+    }
+    
+    return error?.message || 'An unexpected error occurred. Please try again.';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -32,20 +58,64 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
     try {
       if (view === 'signin') {
         const { error } = await signIn(email, password);
-        if (error) throw error;
+        if (error) {
+          const friendlyError = getErrorMessage(error);
+          setError(friendlyError);
+          // If user not found, suggest signup
+          if (friendlyError.includes('No account found') || friendlyError.includes('Invalid email or password')) {
+            setTimeout(() => {
+              if (confirm('Don\'t have an account? Click OK to sign up.')) {
+                switchView('signup');
+              }
+            }, 500);
+          }
+          return;
+        }
         onClose();
       } else if (view === 'signup') {
+        // Validate inputs
+        if (!email || !password) {
+          setError('Please enter both email and password.');
+          return;
+        }
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters long.');
+          return;
+        }
+        
         const { error } = await signUp(email, password, fullName);
-        if (error) throw error;
-        setMessage('Check your email to confirm your account!');
+        if (error) {
+          const friendlyError = getErrorMessage(error);
+          setError(friendlyError);
+          // If email exists, suggest signin
+          if (friendlyError.includes('already exists')) {
+            setTimeout(() => {
+              if (confirm('Already have an account? Click OK to sign in.')) {
+                switchView('signin');
+              }
+            }, 500);
+          }
+          return;
+        }
+        setMessage('Account created successfully! You can now sign in.');
+        // Auto switch to signin after 2 seconds
+        setTimeout(() => {
+          switchView('signin');
+        }, 2000);
       } else if (view === 'reset') {
+        if (!email) {
+          setError('Please enter your email address.');
+          return;
+        }
         const { error } = await resetPassword(email);
-        if (error) throw error;
-        setMessage('Password reset link sent to your email!');
+        if (error) {
+          setError(getErrorMessage(error));
+          return;
+        }
+        setMessage('Password reset link sent! Check your email.');
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-      setError(errorMessage);
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +126,7 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
     setIsLoading(true);
     const { error } = await signInWithGoogle();
     if (error) {
-      setError(error.message);
+      setError(getErrorMessage(error));
       setIsLoading(false);
     }
     // No need to close modal or stop loading - redirect happens
@@ -101,14 +171,17 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
             </p>
           </div>
 
-          {/* Error / Success Messages */}
+          {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error)] text-sm">
-              {error}
+            <div className="mb-4 p-4 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error)] text-sm flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
+
+          {/* Success Message */}
           {message && (
-            <div className="mb-4 p-3 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/20 text-[var(--success)] text-sm">
+            <div className="mb-4 p-4 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/20 text-[var(--success)] text-sm">
               {message}
             </div>
           )}
@@ -138,7 +211,7 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
             {view === 'signup' && (
               <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Full Name
+                  Full Name (optional)
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-tertiary)]" />
@@ -148,7 +221,6 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="John Doe"
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent-indigo)] transition-colors"
-                    required={view === 'signup'}
                   />
                 </div>
               </div>
@@ -184,10 +256,15 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent-indigo)] transition-colors"
-                    required
-                    minLength={6}
+                    required={view !== 'reset'}
+                    minLength={view === 'signup' ? 6 : undefined}
                   />
                 </div>
+                {view === 'signup' && (
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    Must be at least 6 characters
+                  </p>
+                )}
               </div>
             )}
 
@@ -209,11 +286,11 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
               <>
                 <button
                   onClick={() => switchView('reset')}
-                  className="text-[var(--accent-indigo-light)] hover:underline"
+                  className="text-[var(--accent-indigo-light)] hover:underline mb-4 block mx-auto"
                 >
                   Forgot password?
                 </button>
-                <p className="mt-4 text-[var(--text-secondary)]">
+                <p className="text-[var(--text-secondary)]">
                   Don&apos;t have an account?{' '}
                   <button
                     onClick={() => switchView('signup')}
