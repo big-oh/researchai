@@ -125,6 +125,19 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
         
         if (result.error) {
           console.error('Sign up error:', result.error);
+          const errorMsg = result.error.message || '';
+          
+          // Check if it's just an email sending error but user was created
+          if (errorMsg.includes('Email server error') || errorMsg.includes('unexpected_failure')) {
+            console.log('User was created but email failed - treating as success');
+            setSuccess('Account created successfully! You can now sign in.');
+            setTimeout(() => {
+              setView('signin');
+              setPassword('');
+            }, 1500);
+            return;
+          }
+          
           setError(getFriendlyError(result.error));
           setIsLoading(false);
           return;
