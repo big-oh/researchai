@@ -34,18 +34,47 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
     
     if (typeof err === 'string') {
       msg = err;
-    } else if (err.message) {
+    } else if (err.message && typeof err.message === 'string') {
       msg = err.message;
       code = err.code || '';
-    } else if (err.error_description) {
+    } else if (err.error_description && typeof err.error_description === 'string') {
       msg = err.error_description;
     } else if (err.error) {
-      msg = typeof err.error === 'string' ? err.error : err.error.message;
+      if (typeof err.error === 'string') {
+        msg = err.error;
+      } else if (err.error.message && typeof err.error.message === 'string') {
+        msg = err.error.message;
+      } else {
+        try {
+          msg = JSON.stringify(err.error);
+        } catch {
+          msg = String(err.error);
+        }
+      }
     } else {
-      msg = JSON.stringify(err);
+      try {
+        msg = JSON.stringify(err);
+      } catch {
+        msg = String(err) || 'Unknown error';
+      }
     }
     
-    console.log('Extracted message:', msg, 'code:', code);
+    // Check for nested error object (common in Supabase)
+    if (msg === '[object Object]' || !msg) {
+      // Try to extract from common Supabase error structures
+      if (err.__isAuthError || err.name === 'AuthApiError') {
+        msg = err.message || err.msg || '';
+      }
+      // Try toString if it's an object
+      if (!msg && typeof err.toString === 'function') {
+        const str = err.toString();
+        if (str !== '[object Object]') {
+          msg = str;
+        }
+      }
+    }
+    
+    console.log('Extracted message:', msg, 'code:', code, 'type:', typeof err);
     
     // User not found
     if (code === 'user_not_found' || msg.toLowerCase().includes('user not found') || msg.toLowerCase().includes('invalid login')) {
@@ -126,9 +155,18 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
         if (result.error) {
           console.error('Sign up error:', result.error);
           const errorMsg = result.error.message || '';
+          const errorStr = JSON.stringify(result.error);
           
           // Check if it's just an email sending error but user was created
-          if (errorMsg.includes('Email server error') || errorMsg.includes('unexpected_failure')) {
+          // Supabase returns errors in various formats
+          if (
+            errorMsg.includes('Email server error') || 
+            errorMsg.includes('unexpected_failure') ||
+            errorMsg.includes('AuthApiError') ||
+            errorStr.includes('Email server error') ||
+            errorStr.includes('unexpected_failure') ||
+            (result.error.__isAuthError && errorStr.includes('Email'))
+          ) {
             console.log('User was created but email failed - treating as success');
             setSuccess('Account created successfully! You can now sign in.');
             setTimeout(() => {

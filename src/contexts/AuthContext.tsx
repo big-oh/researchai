@@ -105,7 +105,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('AuthContext: Sign up error:', error);
-        return { error: { message: error.message, code: error.code || 'unknown' } };
+        console.error('Error type:', error.constructor?.name);
+        console.error('Error message:', error.message);
+        console.error('Error code:', error.code);
+        console.error('Error status:', error.status);
+        
+        // Return error with all details
+        return { 
+          error: { 
+            message: error.message, 
+            code: error.code || 'unknown',
+            status: error.status,
+            __isAuthError: true,
+            raw: error
+          } 
+        };
       }
 
       console.log('AuthContext: Sign up success:', data.user?.email);
@@ -119,7 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (err: any) {
       console.error('AuthContext: Sign up exception:', err);
-      return { error: { message: err?.message || 'Failed to sign up', code: 'exception' } };
+      console.error('Exception type:', typeof err);
+      console.error('Exception:', err?.toString?.() || String(err));
+      return { error: { message: err?.message || String(err) || 'Failed to sign up', code: 'exception' } };
     }
   }, []);
 
