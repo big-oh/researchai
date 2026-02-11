@@ -165,7 +165,7 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
             errorMsg.includes('AuthApiError') ||
             errorStr.includes('Email server error') ||
             errorStr.includes('unexpected_failure') ||
-            (result.error.__isAuthError && errorStr.includes('Email'))
+            errorStr.includes('AuthApiError')
           ) {
             console.log('User was created but email failed - treating as success');
             setSuccess('Account created successfully! You can now sign in.');
