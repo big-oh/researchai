@@ -94,7 +94,7 @@ export default function ResearchDashboard({ onBack }: ResearchDashboardProps) {
     // Find in saved papers and regenerate
     const saved = savedPapers.find(p => p.id === paperId);
     if (saved) {
-      await generateResearch(saved.topic, saved.word_count);
+      await generateResearch(saved.topic, saved.word_count, saved.format || 'ieee');
     }
   };
 
