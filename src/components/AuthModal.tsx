@@ -24,40 +24,56 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
   if (!isOpen) return null;
 
   const getFriendlyError = (err: any): string => {
-    console.log('Auth error:', err);
+    console.log('Auth error details:', err);
     
     if (!err) return 'An unknown error occurred';
     
-    const msg = err.message || err.toString() || '';
-    const code = err.code || '';
+    // Handle different error formats
+    let msg = '';
+    let code = '';
+    
+    if (typeof err === 'string') {
+      msg = err;
+    } else if (err.message) {
+      msg = err.message;
+      code = err.code || '';
+    } else if (err.error_description) {
+      msg = err.error_description;
+    } else if (err.error) {
+      msg = typeof err.error === 'string' ? err.error : err.error.message;
+    } else {
+      msg = JSON.stringify(err);
+    }
+    
+    console.log('Extracted message:', msg, 'code:', code);
     
     // User not found
-    if (code === 'user_not_found' || msg.includes('user not found') || msg.includes('Invalid login')) {
+    if (code === 'user_not_found' || msg.toLowerCase().includes('user not found') || msg.toLowerCase().includes('invalid login')) {
       return 'Account not found. Please sign up first.';
     }
     
     // Wrong password
-    if (code === 'invalid_credentials' || msg.includes('Invalid login credentials')) {
+    if (code === 'invalid_credentials' || msg.toLowerCase().includes('invalid login')) {
       return 'Incorrect email or password. Please try again.';
     }
     
     // Email already exists
-    if (code === 'email_exists' || code === 'user_already_exists' || msg.includes('already registered')) {
+    if (code === 'email_exists' || code === 'user_already_exists' || msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) {
       return 'An account with this email already exists. Please sign in.';
     }
     
     // Weak password
-    if (code === 'weak_password' || msg.includes('weak')) {
+    if (code === 'weak_password' || msg.toLowerCase().includes('weak') || msg.toLowerCase().includes('password')) {
       return 'Password is too weak. Use at least 6 characters.';
     }
     
     // Invalid email
-    if (code === 'invalid_email' || msg.includes('valid email')) {
+    if (code === 'invalid_email' || msg.toLowerCase().includes('valid email')) {
       return 'Please enter a valid email address.';
     }
     
     // Network error
-    if (msg.includes('network') || msg.includes('fetch') || msg.includes('connection')) {
+    if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('connection')) {
       return 'Network error. Please check your internet connection.';
     }
     
@@ -73,11 +89,12 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
     try {
       if (view === 'signin') {
         console.log('Attempting sign in...', email);
-        const { error: signInError } = await signIn(email.trim(), password);
+        const result = await signIn(email.trim(), password);
+        console.log('Sign in result:', result);
         
-        if (signInError) {
-          console.error('Sign in error:', signInError);
-          setError(getFriendlyError(signInError));
+        if (result.error) {
+          console.error('Sign in error:', result.error);
+          setError(getFriendlyError(result.error));
           setIsLoading(false);
           return;
         }
@@ -103,11 +120,12 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
         }
         
         console.log('Attempting sign up...', email);
-        const { error: signUpError } = await signUp(email.trim(), password, fullName.trim() || undefined);
+        const result = await signUp(email.trim(), password, fullName.trim() || undefined);
+        console.log('Sign up result:', result);
         
-        if (signUpError) {
-          console.error('Sign up error:', signUpError);
-          setError(getFriendlyError(signUpError));
+        if (result.error) {
+          console.error('Sign up error:', result.error);
+          setError(getFriendlyError(result.error));
           setIsLoading(false);
           return;
         }
@@ -127,11 +145,12 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
         }
         
         console.log('Sending reset email...', email);
-        const { error: resetError } = await resetPassword(email.trim());
+        const result = await resetPassword(email.trim());
+        console.log('Reset result:', result);
         
-        if (resetError) {
-          console.error('Reset error:', resetError);
-          setError(getFriendlyError(resetError));
+        if (result.error) {
+          console.error('Reset error:', result.error);
+          setError(getFriendlyError(result.error));
           setIsLoading(false);
           return;
         }
@@ -139,7 +158,9 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
         setSuccess('Reset link sent! Check your email.');
       }
     } catch (err: any) {
-      console.error('Unexpected error:', err);
+      console.error('Unexpected error in handleSubmit:', err);
+      console.error('Error type:', typeof err);
+      console.error('Error keys:', Object.keys(err || {}));
       setError(getFriendlyError(err));
     } finally {
       setIsLoading(false);
