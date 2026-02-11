@@ -1,13 +1,19 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+
+interface AuthError {
+  message: string;
+  code?: string;
+}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
+  isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
@@ -22,80 +28,182 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then((result: { data: { session: Session | null } }) => {
-      setSession(result.data.session);
-      setUser(result.data.session?.user ?? null);
-      setIsLoading(false);
-    });
+    console.log('AuthProvider: Initializing...');
+    
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('AuthProvider: Error getting session:', error);
+        }
+        
+        console.log('AuthProvider: Session:', currentSession ? 'found' : 'not found');
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      } catch (err) {
+        console.error('AuthProvider: Failed to initialize:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      console.log('AuthProvider: Auth state changed:', event);
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
-  };
+  const signIn = useCallback(async (email: string, password: string) => {
+    console.log('AuthContext: Signing in...', email);
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
+      if (error) {
+        console.error('AuthContext: Sign in error:', error);
+        return { error: { message: error.message, code: error.code || 'unknown' } };
+      }
+
+      console.log('AuthContext: Sign in success:', data.user?.email);
+      setSession(data.session);
+      setUser(data.user);
+      return { error: null };
+    } catch (err: any) {
+      console.error('AuthContext: Sign in exception:', err);
+      return { error: { message: err?.message || 'Failed to sign in', code: 'exception' } };
+    }
+  }, []);
+
+  const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
+    console.log('AuthContext: Signing up...', email);
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: fullName?.trim() || undefined,
+          },
         },
-      },
-    });
-    return { error };
-  };
+      });
 
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    return { error };
-  };
+      if (error) {
+        console.error('AuthContext: Sign up error:', error);
+        return { error: { message: error.message, code: error.code || 'unknown' } };
+      }
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
-  };
+      console.log('AuthContext: Sign up success:', data.user?.email);
+      
+      // If auto-confirm is enabled, user might be signed in already
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.user);
+      }
+      
+      return { error: null };
+    } catch (err: any) {
+      console.error('AuthContext: Sign up exception:', err);
+      return { error: { message: err?.message || 'Failed to sign up', code: 'exception' } };
+    }
+  }, []);
 
-  const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    });
-    return { error };
+  const signInWithGoogle = useCallback(async () => {
+    console.log('AuthContext: Signing in with Google...');
+    
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' 
+            ? `${window.location.origin}/auth/callback`
+            : '/auth/callback',
+        },
+      });
+
+      if (error) {
+        console.error('AuthContext: Google sign in error:', error);
+        return { error: { message: error.message, code: error.code || 'unknown' } };
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      console.error('AuthContext: Google sign in exception:', err);
+      return { error: { message: err?.message || 'Failed to sign in with Google', code: 'exception' } };
+    }
+  }, []);
+
+  const signOut = useCallback(async () => {
+    console.log('AuthContext: Signing out...');
+    
+    try {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('AuthContext: Sign out error:', error);
+        return { error: { message: error.message } };
+      }
+
+      setSession(null);
+      setUser(null);
+      return { error: null };
+    } catch (err: any) {
+      console.error('AuthContext: Sign out exception:', err);
+      return { error: { message: err?.message || 'Failed to sign out' } };
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email: string) => {
+    console.log('AuthContext: Resetting password...', email);
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/reset-password`
+          : '/auth/reset-password',
+      });
+
+      if (error) {
+        console.error('AuthContext: Reset password error:', error);
+        return { error: { message: error.message, code: error.code || 'unknown' } };
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      console.error('AuthContext: Reset password exception:', err);
+      return { error: { message: err?.message || 'Failed to send reset email', code: 'exception' } };
+    }
+  }, []);
+
+  const value = {
+    user,
+    session,
+    isLoading,
+    isAuthenticated: !!user,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signOut,
+    resetPassword,
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        isLoading,
-        signIn,
-        signUp,
-        signInWithGoogle,
-        signOut,
-        resetPassword,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
