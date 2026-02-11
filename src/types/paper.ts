@@ -1,3 +1,5 @@
+export type PaperFormat = 'ieee' | 'apa' | 'mla' | 'chicago' | 'harvard';
+
 export interface ResearchPaper {
   title: string;
   abstract: string;
@@ -9,11 +11,13 @@ export interface ResearchPaper {
   conclusion: string;
   references: string[];
   wordCount: number;
+  format: PaperFormat;
 }
 
 export interface ResearchRequest {
   topic: string;
   wordCount: number;
+  format: PaperFormat;
 }
 
 export interface SavedPaper {

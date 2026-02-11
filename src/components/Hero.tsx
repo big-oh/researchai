@@ -5,12 +5,9 @@ import { useEffect, useState } from 'react';
 
 interface HeroProps {
   onStart: () => void;
-  onSignIn?: () => void;
-  onSignUp?: () => void;
-  isAuthenticated?: boolean;
 }
 
-export default function Hero({ onStart, onSignIn, onSignUp, isAuthenticated }: HeroProps) {
+export default function Hero({ onStart }: HeroProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -73,29 +70,12 @@ export default function Hero({ onStart, onSignIn, onSignUp, isAuthenticated }: H
           <a href="#pricing" className="nav-link text-sm">Pricing</a>
           <a href="#" className="nav-link text-sm">Docs</a>
           
-          {isAuthenticated ? (
-            <button 
-              onClick={onStart}
-              className="btn btn-secondary text-sm py-2.5 px-5"
-            >
-              Dashboard
-            </button>
-          ) : (
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={onSignIn}
-                className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                Sign In
-              </button>
-              <button 
-                onClick={onSignUp}
-                className="btn btn-secondary text-sm py-2.5 px-5"
-              >
-                Get Started
-              </button>
-            </div>
-          )}
+          <button 
+            onClick={onStart}
+            className="btn btn-secondary text-sm py-2.5 px-5"
+          >
+            Get Started
+          </button>
         </div>
       </nav>
 

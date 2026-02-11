@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, BookOpen, Hash, FileText, Lightbulb, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, BookOpen, Hash, FileText, Lightbulb, ChevronDown, ChevronUp, FileType } from 'lucide-react';
+import { PaperFormat } from '@/types/paper';
 
 interface ResearchFormProps {
-  onSubmit: (topic: string, wordCount: number) => void;
+  onSubmit: (topic: string, wordCount: number, format: PaperFormat) => void;
   loading: boolean;
 }
 
@@ -16,9 +17,18 @@ const suggestedTopics = [
   'Quantum Computing Advances',
 ];
 
+const formats: { value: PaperFormat; label: string; description: string }[] = [
+  { value: 'ieee', label: 'IEEE', description: 'Institute of Electrical and Electronics Engineers' },
+  { value: 'apa', label: 'APA', description: 'American Psychological Association' },
+  { value: 'mla', label: 'MLA', description: 'Modern Language Association' },
+  { value: 'chicago', label: 'Chicago', description: 'Chicago Manual of Style' },
+  { value: 'harvard', label: 'Harvard', description: 'Harvard Referencing Style' },
+];
+
 export default function ResearchForm({ onSubmit, loading }: ResearchFormProps) {
   const [topic, setTopic] = useState('');
   const [wordCount, setWordCount] = useState(2000);
+  const [format, setFormat] = useState<PaperFormat>('ieee');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [charCount, setCharCount] = useState(0);
@@ -26,7 +36,7 @@ export default function ResearchForm({ onSubmit, loading }: ResearchFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (topic.trim()) {
-      onSubmit(topic.trim(), wordCount);
+      onSubmit(topic.trim(), wordCount, format);
     }
   };
 
@@ -180,6 +190,34 @@ export default function ResearchForm({ onSubmit, loading }: ResearchFormProps) {
               <span>7.5K</span>
               <span>10K</span>
             </div>
+          </div>
+        </div>
+
+        {/* Format Selection */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
+            <div className="flex items-center gap-2">
+              <FileType className="w-4 h-4 text-[var(--accent-purple-light)]" />
+              Paper Format
+            </div>
+          </label>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {formats.map((fmt) => (
+              <button
+                key={fmt.value}
+                type="button"
+                onClick={() => setFormat(fmt.value)}
+                className={`p-3 rounded-xl border text-left transition-all duration-200 ${
+                  format === fmt.value
+                    ? 'bg-[var(--accent-indigo)]/10 border-[var(--accent-indigo)] text-[var(--text-primary)]'
+                    : 'bg-[var(--bg-tertiary)] border-[var(--border-default)] text-[var(--text-secondary)] hover:border-[var(--border-hover)]'
+                }`}
+              >
+                <div className="font-semibold text-sm">{fmt.label}</div>
+                <div className="text-xs opacity-70 mt-0.5 truncate">{fmt.description}</div>
+              </button>
+            ))}
           </div>
         </div>
 

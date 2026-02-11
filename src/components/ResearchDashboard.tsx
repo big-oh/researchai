@@ -11,13 +11,14 @@ import {
 } from 'lucide-react';
 import ResearchForm from './ResearchForm';
 import PaperPreview from './PaperPreview';
-import { ResearchPaper } from '@/types/paper';
+import { ResearchPaper, PaperFormat } from '@/types/paper';
 
 interface SavedPaper {
   id: string;
   title: string;
   topic: string;
   word_count: number;
+  format: PaperFormat;
   created_at: string;
 }
 
@@ -51,7 +52,7 @@ export default function ResearchDashboard({ onBack }: ResearchDashboardProps) {
     setSavedPapers(papers);
   };
 
-  const generateResearch = async (topic: string, wordCount: number) => {
+  const generateResearch = async (topic: string, wordCount: number, format: PaperFormat) => {
     setLoading(true);
     setError('');
     
@@ -59,7 +60,7 @@ export default function ResearchDashboard({ onBack }: ResearchDashboardProps) {
       const response = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, wordCount }),
+        body: JSON.stringify({ topic, wordCount, format }),
       });
 
       if (!response.ok) {
@@ -75,6 +76,7 @@ export default function ResearchDashboard({ onBack }: ResearchDashboardProps) {
         title: data.paper.title,
         topic: topic,
         word_count: wordCount,
+        format: format,
         created_at: new Date().toISOString(),
       };
       

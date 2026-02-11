@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-server';
 export async function POST(request: NextRequest) {
   try {
     const body: ResearchRequest = await request.json();
-    const { topic, wordCount } = body;
+    const { topic, wordCount, format = 'ieee' } = body;
 
     if (!topic) {
       return NextResponse.json({ error: 'Topic is required' }, { status: 400 });
@@ -17,7 +17,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
     }
 
-    const prompt = `Write an IEEE research paper about "${topic}" in ${wordCount} words. 
+    // Format-specific instructions
+    const formatInstructions: Record<string, string> = {
+      ieee: `IEEE Format Instructions:
+- Use IEEE citation style: [1] Author, "Title," Journal, vol. X, no. Y, pp. Z, Month Year.
+- Structure: Title, Abstract, Keywords, Introduction, Methodology, Results, Discussion, Conclusion, References
+- Use formal academic tone`,
+      
+      apa: `APA Format Instructions:
+- Use APA 7th edition citation style: Author, A. A. (Year). Title. Journal Name, vol(issue), pp-pp. https://doi.org/xxxxx
+- Structure: Title Page, Abstract, Introduction, Method, Results, Discussion, References
+- Include running head and page numbers
+- Use author-date in-text citations (Author, Year)`,
+      
+      mla: `MLA Format Instructions:
+- Use MLA 9th edition citation style: Author. "Title." Journal Name, vol. X, no. Y, Year, pp. Z.
+- Structure: Heading, Title, Introduction, Body (with sections), Conclusion, Works Cited
+- Use parenthetical in-text citations (Author page)`,
+      
+      chicago: `Chicago Format Instructions:
+- Use Chicago 17th edition (Notes-Bibliography) citation style
+- Use footnotes for citations
+- Bibliography format: Author. Title. Journal Name vol, no. X (Year): pp-pp.
+- Structure: Title, Introduction, Body with footnotes, Conclusion, Bibliography`,
+      
+      harvard: `Harvard Format Instructions:
+- Use Harvard referencing style: Author, A.A. (Year) 'Title', Journal Name, Volume(Issue), pp. xx-xx.
+- Structure: Title, Abstract, Introduction, Literature Review, Methodology, Results, Discussion, Conclusion, References
+- Use author-date in-text citations (Author, Year)`
+    };
+
+    const formatPrompt = formatInstructions[format] || formatInstructions.ieee;
+
+    const prompt = `Write a ${format.toUpperCase()} research paper about "${topic}" in ${wordCount} words. 
+
+${formatPrompt}
 
 IMPORTANT: Return ONLY a valid JSON object. No markdown, no explanations, no code blocks.
 
@@ -32,8 +66,8 @@ Required JSON structure:
   "discussion": "Discussion section...",
   "conclusion": "Conclusion section...",
   "references": [
-    "[1] Author Name, 'Paper Title,' Journal Name, vol. X, no. Y, pp. Z, Month Year.",
-    "[2] Author Name, 'Paper Title,' Conference Name, Year."
+    "Reference 1 in ${format.toUpperCase()} format",
+    "Reference 2 in ${format.toUpperCase()} format"
   ]
 }
 
@@ -43,7 +77,8 @@ Rules:
 3. No text before or after the JSON
 4. Ensure valid JSON syntax
 5. Abstract should be 150-200 words
-6. Include 5-8 references in IEEE format`;
+6. Include 5-8 references in ${format.toUpperCase()} format
+7. Follow the specific ${format.toUpperCase()} formatting guidelines above`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
@@ -132,6 +167,7 @@ Rules:
     }
     
     paper.wordCount = wordCount;
+    paper.format = format;
 
     // Try to save to Supabase if user is authenticated
     try {
