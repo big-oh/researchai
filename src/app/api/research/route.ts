@@ -17,41 +17,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
     }
 
-    // Format-specific instructions
-    const formatInstructions: Record<string, string> = {
-      ieee: `IEEE Format Instructions:
-- Use IEEE citation style: [1] Author, "Title," Journal, vol. X, no. Y, pp. Z, Month Year.
-- Structure: Title, Abstract, Keywords, Introduction, Methodology, Results, Discussion, Conclusion, References
-- Use formal academic tone`,
-      
-      apa: `APA Format Instructions:
-- Use APA 7th edition citation style: Author, A. A. (Year). Title. Journal Name, vol(issue), pp-pp. https://doi.org/xxxxx
-- Structure: Title Page, Abstract, Introduction, Method, Results, Discussion, References
-- Include running head and page numbers
-- Use author-date in-text citations (Author, Year)`,
-      
-      mla: `MLA Format Instructions:
-- Use MLA 9th edition citation style: Author. "Title." Journal Name, vol. X, no. Y, Year, pp. Z.
-- Structure: Heading, Title, Introduction, Body (with sections), Conclusion, Works Cited
-- Use parenthetical in-text citations (Author page)`,
-      
-      chicago: `Chicago Format Instructions:
-- Use Chicago 17th edition (Notes-Bibliography) citation style
-- Use footnotes for citations
-- Bibliography format: Author. Title. Journal Name vol, no. X (Year): pp-pp.
-- Structure: Title, Introduction, Body with footnotes, Conclusion, Bibliography`,
-      
-      harvard: `Harvard Format Instructions:
-- Use Harvard referencing style: Author, A.A. (Year) 'Title', Journal Name, Volume(Issue), pp. xx-xx.
-- Structure: Title, Abstract, Introduction, Literature Review, Methodology, Results, Discussion, Conclusion, References
-- Use author-date in-text citations (Author, Year)`
+    // Format-specific citation styles
+    const citationStyles: Record<string, string> = {
+      ieee: 'IEEE: [1] A. Author, "Title," Journal, vol. X, no. Y, pp. Z, Month Year.',
+      apa: 'APA: Author, A. A. (Year). Title. Journal Name, vol(issue), pp-pp.',
+      mla: 'MLA: Author. "Title." Journal Name, vol. X, no. Y, Year, pp. Z.',
+      chicago: 'Chicago: Author. Title. Journal Name vol, no. X (Year): pp-pp.',
+      harvard: 'Harvard: Author, A.A. (Year) Title, Journal Name, Volume(Issue), pp. xx-xx.'
     };
 
-    const formatPrompt = formatInstructions[format] || formatInstructions.ieee;
+    const citationStyle = citationStyles[format] || citationStyles.ieee;
 
-    const prompt = `Write a ${format.toUpperCase()} research paper about "${topic}" in ${wordCount} words. 
+    const prompt = `Write a research paper about "${topic}" in ${wordCount} words. 
 
-${formatPrompt}
+Use ${format.toUpperCase()} citation style: ${citationStyle}
 
 IMPORTANT: Return ONLY a valid JSON object. No markdown, no explanations, no code blocks.
 
@@ -66,19 +45,17 @@ Required JSON structure:
   "discussion": "Discussion section...",
   "conclusion": "Conclusion section...",
   "references": [
-    "Reference 1 in ${format.toUpperCase()} format",
-    "Reference 2 in ${format.toUpperCase()} format"
+    "[1] First reference in ${format.toUpperCase()} style",
+    "[2] Second reference in ${format.toUpperCase()} style"
   ]
 }
 
 Rules:
-1. Return ONLY the JSON object
-2. No markdown formatting (no \`\`\`json)
-3. No text before or after the JSON
-4. Ensure valid JSON syntax
-5. Abstract should be 150-200 words
-6. Include 5-8 references in ${format.toUpperCase()} format
-7. Follow the specific ${format.toUpperCase()} formatting guidelines above`;
+1. Return ONLY the JSON object, no markdown
+2. No text before or after the JSON
+3. Valid JSON syntax only
+4. Abstract: 150-200 words
+5. Include 5-8 references in ${format.toUpperCase()} format`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
@@ -169,31 +146,10 @@ Rules:
     paper.wordCount = wordCount;
     paper.format = format;
 
-    // Try to save to Supabase if user is authenticated
-    try {
-      const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        await supabase.from('papers').insert({
-          user_id: user.id,
-          title: paper.title,
-          topic: topic,
-          abstract: paper.abstract,
-          keywords: paper.keywords,
-          introduction: paper.introduction,
-          methodology: paper.methodology,
-          results: paper.results,
-          discussion: paper.discussion,
-          conclusion: paper.conclusion,
-          references: paper.references,
-          word_count: wordCount,
-        });
-      }
-    } catch (saveError) {
-      // Don't fail the request if saving fails - user still gets their paper
-      console.error('Error saving paper to database:', saveError);
-    }
+    paper.format = format;
+
+    // Skip Supabase save for now since auth is removed
+    // Papers are saved to localStorage on the client side
 
     return NextResponse.json({ paper });
     
