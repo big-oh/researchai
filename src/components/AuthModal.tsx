@@ -256,7 +256,7 @@ export default function AuthModal({ isOpen, onClose, defaultView = 'signin' }: A
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent-indigo)] transition-colors"
-                    required={view !== 'reset'}
+                    required
                     minLength={view === 'signup' ? 6 : undefined}
                   />
                 </div>
